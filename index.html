@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chutnej Bistro — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ── reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:     #f4f6f8;
+  --card:   #ffffff;
+  --card2:  #f0f7f2;
+  --border: rgba(30,90,60,0.14);
+  --accent: #1a7a3c;
+  --a2:     #156030;
+  --a3:     #0e4422;
+  --amber:  #b86a00;
+  --coral:  #c0340d;
+  --blue:   #1a5fa8;
+  --purple: #5a45b0;
+  --muted:  #5a7a62;
+  --txt:    #0f1f14;
+  --txt2:   #2d5038;
+  --txt3:   #5a7a62;
+  --grid:   rgba(30,90,60,0.07);
+}
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--txt);
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* ── layout ───────────────────────────────────────────────── */
+.page { max-width: 1200px; margin: 0 auto; padding: 20px 20px 40px; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px; padding-bottom: 14px;
+  border-bottom: 0.5px solid var(--border);
+}
+.topbar h1 { font-size: 20px; font-weight: 500; color: var(--accent); }
+.topbar .sub { font-size: 12px; color: var(--txt3); margin-top: 2px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.badge {
+  display: inline-block; font-size: 10px; padding: 3px 9px;
+  border-radius: 4px; background: rgba(26,122,60,.1);
+  color: var(--accent); font-weight: 500;
+  border: 0.5px solid rgba(26,122,60,.3);
+}
+.loading-bar {
+  display: none; font-size: 11px; color: var(--txt3);
+  padding: 3px 10px; border-radius: 4px;
+  background: rgba(26,122,60,.07); border: 0.5px solid var(--border);
+}
+.loading-bar.active { display: block; }
+.error-banner {
+  display: none; background: rgba(192,52,13,.08);
+  border: 0.5px solid var(--coral); border-radius: 8px;
+  padding: 10px 14px; font-size: 12px; color: #a02a08;
+  margin-bottom: 12px;
+}
+.error-banner.active { display: block; }
+
+/* ── section labels ───────────────────────────────────────── */
+.section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: .09em;
+  color: var(--txt3); text-transform: uppercase;
+  margin: 20px 0 10px;
+}
+
+/* ── KPI grid ─────────────────────────────────────────────── */
+.kpi4 { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+.kpi2 { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+.kpi {
+  background: var(--card); border: 0.5px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.kl { font-size: 10px; color: var(--txt3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.kv { font-size: 22px; font-weight: 600; color: var(--accent); }
+.ks { font-size: 10px; color: var(--txt3); margin-top: 2px; }
+.pos { color: #1a7a3c; } .neg { color: #c0340d; } .warn { color: #b86a00; }
+
+/* ── cards ────────────────────────────────────────────────── */
+.card {
+  background: var(--card); border: 0.5px solid var(--border);
+  border-radius: 11px; padding: 16px; margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.card-accent {
+  background: var(--card2); border: 1px solid rgba(26,122,60,.25);
+  border-radius: 11px; padding: 16px; margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.ct { font-size: 14px; font-weight: 600; color: var(--txt); margin-bottom: 2px; }
+.cs { font-size: 11px; color: var(--txt3); margin-bottom: 12px; }
+
+/* ── two-col ──────────────────────────────────────────────── */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.three { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-bottom: 12px; }
+
+/* ── legend ───────────────────────────────────────────────── */
+.leg { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; font-size: 12px; color: var(--txt2); font-weight: 500; }
+.leg span { display: flex; align-items: center; gap: 5px; }
+.dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+
+/* ── controls ─────────────────────────────────────────────── */
+.sl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--txt2); margin-bottom: 11px; }
+.sl-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.sl-val { min-width: 36px; font-weight: 700; color: var(--accent); font-size: 13px; text-align: right; }
+.yr-tabs { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
+.yr-tab {
+  font-size: 12px; padding: 5px 13px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--txt2); cursor: pointer; transition: all .15s; font-weight: 500;
+}
+.yr-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.yr-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+.scen-row { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.scen {
+  flex: 1; min-width: 110px; text-align: center;
+  border-radius: 8px; padding: 8px 6px;
+  border: 1.5px solid var(--border); background: var(--card);
+  cursor: pointer; transition: all .15s;
+  font-size: 11px; color: var(--txt2); line-height: 1.6;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.scen.active { border-color: var(--accent); background: rgba(26,122,60,.06); color: var(--accent); }
+.scen:hover:not(.active) { border-color: var(--a2); }
+.pbrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.pbrow label { font-size: 11px; color: var(--txt2); font-weight: 500; }
+.pbrow input[type=number] {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--txt); font-size: 12px;
+  padding: 5px 9px; width: 120px;
+}
+.pbrow input[type=number].narrow { width: 60px; }
+.pbrow input:focus { outline: none; border-color: var(--accent); }
+.pbr-wrap { margin-bottom: 10px; }
+.pbr-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--txt3); margin-bottom: 5px; font-weight: 500; }
+.pbr-track { height: 8px; background: #e0e8e2; border-radius: 4px; overflow: hidden; }
+.pbr-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s, background .4s; }
+.pgrid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+.pitem { background: rgba(26,122,60,.06); border: 0.5px solid rgba(26,122,60,.15); border-radius: 8px; padding: 9px 11px; }
+.pl { font-size: 10px; color: var(--txt3); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.pv { font-size: 17px; font-weight: 700; color: var(--accent); }
+.sep { height: 1px; background: var(--border); margin: 12px 0; }
+.note { font-size: 11px; color: var(--txt3); line-height: 1.7; }
+
+/* ── canvas wrappers ──────────────────────────────────────── */
+.ch { position: relative; width: 100%; }
+
+/* ── config panel ─────────────────────────────────────────── */
+.cfg-panel {
+  background: var(--card); border: 0.5px solid var(--border);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;
+  font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.cfg-panel summary { cursor: pointer; color: var(--txt2); font-size: 12px; user-select: none; font-weight: 500; }
+.cfg-panel summary:hover { color: var(--accent); }
+.cfg-fields { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: flex-end; }
+.cfg-field { display: flex; flex-direction: column; gap: 4px; }
+.cfg-field label { font-size: 10px; color: var(--txt3); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.cfg-field input {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--txt); font-size: 12px;
+  padding: 5px 9px; width: 260px;
+}
+.cfg-field input.narrow { width: 100px; }
+.cfg-field input:focus { outline: none; border-color: var(--accent); }
+.cfg-btn {
+  background: var(--accent); border: none;
+  border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;
+  padding: 7px 16px; cursor: pointer; transition: all .15s;
+  align-self: flex-end;
+}
+.cfg-btn:hover { background: var(--a2); }
+
+/* ── 3y forecast table ────────────────────────────────────── */
+.forecast-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+.forecast-table th { font-size: 11px; color: var(--txt3); font-weight: 600; padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+.forecast-table th:first-child { text-align: left; }
+.forecast-table td { padding: 6px 8px; text-align: right; border-bottom: 0.5px solid rgba(30,90,60,0.07); font-weight: 500; }
+.forecast-table td:first-child { text-align: left; color: var(--txt3); font-size: 12px; font-weight: 400; }
+.opt  { color: #1a7a3c; font-weight: 700; }
+.con  { color: #b86a00; font-weight: 700; }
+.pes  { color: #c0340d; font-weight: 700; }
+
+/* ── responsive ───────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .kpi4 { grid-template-columns: repeat(2,1fr); }
+  .two, .three { grid-template-columns: 1fr; }
+  .pgrid { grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 440px) {
+  .kpi4, .kpi2 { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ── TOPBAR ──────────────────────────────────────────────── -->
+<div class="topbar">
+  <div>
+    <h1>Chutnej Bistro — Manažerský Dashboard</h1>
+    <div class="sub">Tržby · kanálový mix · cash flow · plánovaný zisk · 3letý výhled</div>
+  </div>
+  <div class="topbar-right">
+    <span class="loading-bar" id="loading-bar">↻ Načítám data…</span>
+    <span class="badge" id="data-badge">záložní data</span>
+  </div>
+</div>
+
+<!-- ── GOOGLE SHEETS CONFIG ─────────────────────────────────── -->
+<details class="cfg-panel" id="cfg-panel">
+  <summary>⚙ Nastavení Google Sheets — klikni pro propojení s live daty</summary>
+  <div class="cfg-fields">
+    <div class="cfg-field">
+      <label>ID Google Sheetu</label>
+      <input type="text" id="sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+    </div>
+    <div class="cfg-field">
+      <label>GID listu "Po dnech"</label>
+      <input type="text" id="gid-days" placeholder="0" class="narrow" />
+    </div>
+    <div class="cfg-field">
+      <label>GID listu "Po měsících"</label>
+      <input type="text" id="gid-months" placeholder="1234567" class="narrow" />
+    </div>
+    <button class="cfg-btn" onclick="connectSheets()">Připojit a načíst →</button>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:var(--txt3)">
+    Sheet musí být publikován: <strong style="color:var(--txt2)">Soubor → Sdílení → Publikovat na webu → Celý dokument → CSV</strong>
+  </div>
+</details>
+
+<div class="error-banner" id="error-banner"></div>
+
+<!-- ── SEKCE 1: TÝDENNÍ TRŽBY ───────────────────────────────── -->
+<div class="section-label">Týdenní tržby (Po–Ne)</div>
+
+<div class="kpi4">
+  <div class="kpi"><div class="kl">Poslední týden</div><div class="kv" id="kw-total">—</div><div class="ks" id="kw-range">—</div></div>
+  <div class="kpi"><div class="kl">Průměr / den</div><div class="kv" id="kw-avg">—</div><div class="ks">tento týden</div></div>
+  <div class="kpi"><div class="kl">Změna vs. min. týden</div><div class="kv" id="kw-diff">—</div><div class="ks" id="kw-diff-abs">—</div></div>
+  <div class="kpi"><div class="kl">Nejsilnější kanál</div><div class="kv" id="kw-top">—</div><div class="ks" id="kw-top-val">—</div></div>
+</div>
+
+<div class="card">
+  <div class="ct">Týdenní tržby — posledních 14 týdnů</div>
+  <div class="cs">Každý sloupec = jeden týden pondělí–neděle · data ze záložky "Po dnech"</div>
+  <div class="leg">
+    <span><span class="dot" style="background:#1a7a3c"></span>Web</span>
+    <span><span class="dot" style="background:#1a5fa8"></span>DJ</span>
+    <span><span class="dot" style="background:#b86a00"></span>Wolt</span>
+    <span><span class="dot" style="background:#c0340d"></span>Uber</span>
+    <span><span class="dot" style="background:#7b3fa0"></span>Bistro</span>
+  </div>
+  <div class="ch" style="height:230px"><canvas id="wc" role="img" aria-label="Týdenní tržby 14 týdnů"></canvas></div>
+</div>
+
+<!-- ── SEKCE 2: MĚSÍČNÍ TRŽBY ───────────────────────────────── -->
+<div class="section-label">Měsíční tržby a roční trend</div>
+
+<div class="kpi4">
+  <div class="kpi"><div class="kl">Celkové tržby (hist.)</div><div class="kv">15,3 M Kč</div><div class="ks">2017–2020 Q1</div></div>
+  <div class="kpi"><div class="kl">Průměr / měsíc</div><div class="kv">381 K Kč</div><div class="ks">40 měsíců dat</div></div>
+  <div class="kpi"><div class="kl">Nejsilnější měsíc</div><div class="kv">761 K Kč</div><div class="ks">Březen 2020</div></div>
+  <div class="kpi"><div class="kl">Růst 2017 → 2019</div><div class="kv pos">+169 %</div><div class="ks">roční tržby</div></div>
+</div>
+
+<div class="card">
+  <div class="ct">Vývoj měsíčních tržeb 2017–2020 podle kanálů</div>
+  <div class="cs">Stohovaný bar chart · kumulativní pohled na kanálový mix v čase</div>
+  <div class="leg">
+    <span><span class="dot" style="background:#1a7a3c"></span>Web</span>
+    <span><span class="dot" style="background:#1a5fa8"></span>DJ</span>
+    <span><span class="dot" style="background:#b86a00"></span>Wolt</span>
+    <span><span class="dot" style="background:#c0340d"></span>Uber</span>
+    <span><span class="dot" style="background:#7b3fa0"></span>Bistro</span>
+  </div>
+  <div class="ch" style="height:260px"><canvas id="mc-monthly" role="img" aria-label="Měsíční tržby 2017-2020"></canvas></div>
+</div>
+
+<!-- ── SEKCE 3: KANÁLOVÝ MIX ────────────────────────────────── -->
+<div class="section-label">Kanálový mix</div>
+
+<div class="two">
+  <div class="card" style="margin-bottom:0">
+    <div class="ct">Průměrný mix kanálů</div>
+    <div class="cs">Přepínání rokem — záložky nebo šoupátko</div>
+    <div class="yr-tabs">
+      <button class="yr-tab" onclick="setYear(0,this)">2017</button>
+      <button class="yr-tab" onclick="setYear(1,this)">2018</button>
+      <button class="yr-tab active" onclick="setYear(2,this)">2019</button>
+      <button class="yr-tab" onclick="setYear(3,this)">2020</button>
+    </div>
+    <div class="sl-row">
+      <span style="font-size:10px;color:var(--txt3)">2017</span>
+      <input type="range" min="0" max="3" step="1" value="2" id="yr-sl" oninput="setYear(+this.value,null,true)">
+      <span style="font-size:10px;color:var(--txt3)">2020</span>
+      <span class="sl-val" id="yr-label">2019</span>
+    </div>
+    <div class="ch" style="height:210px"><canvas id="mix-donut" role="img" aria-label="Kanálový mix donut"></canvas></div>
+  </div>
+
+  <div class="card" style="margin-bottom:0">
+    <div class="ct">Vývoj podílu kanálů 2017–2020</div>
+    <div class="cs">Jak rostly delivery platformy na úkor přímého prodeje</div>
+    <div class="leg">
+      <span><span class="dot" style="background:#1a7a3c"></span>Web</span>
+      <span><span class="dot" style="background:#1a5fa8"></span>DJ</span>
+      <span><span class="dot" style="background:#b86a00"></span>Wolt</span>
+      <span><span class="dot" style="background:#7b3fa0"></span>Bistro</span>
+    </div>
+    <div class="ch" style="height:240px"><canvas id="mix-trend" role="img" aria-label="Vývoj mix kanálů"></canvas></div>
+  </div>
+</div>
+
+<!-- ── SEKCE 4: CF & ZISKOVOST ──────────────────────────────── -->
+<div class="section-label">Cash flow a ziskovost (modelový odhad)</div>
+
+<div class="kpi4">
+  <div class="kpi"><div class="kl">Odh. marže delivery</div><div class="kv">18–22 %</div><div class="ks">po provizích platforem</div></div>
+  <div class="kpi"><div class="kl">Odh. marže bistro</div><div class="kv">30–38 %</div><div class="ks">přímý prodej</div></div>
+  <div class="kpi"><div class="kl">Roční CF 2019 (odhad)</div><div class="kv">~1,38 M</div><div class="ks">tržby 6,95 M · marže 20 %</div></div>
+  <div class="kpi"><div class="kl">Wolt / Uber provize</div><div class="kv warn">~25 %</div><div class="ks">standardní sazba</div></div>
+</div>
+
+<div class="card">
+  <div class="ct">Roční tržby, odhadovaný CF a provize platforem</div>
+  <div class="cs">Provize platforem odečteny před výpočtem CF · marže 22 %</div>
+  <div class="leg">
+    <span><span class="dot" style="background:#1a7a3c"></span>Hrubé tržby</span>
+    <span><span class="dot" style="background:#1a5fa8"></span>Odh. provozní CF</span>
+    <span><span class="dot" style="background:#b86a00"></span>Provize platforem</span>
+  </div>
+  <div class="ch" style="height:220px"><canvas id="cf-chart" role="img" aria-label="CF a provize platforem"></canvas></div>
+</div>
+
+<!-- ── SEKCE 5: PLÁNOVANÝ ZISK ──────────────────────────────── -->
+<div class="section-label">Plánovaný zisk ke konci roku 2020</div>
+
+<div class="card-accent">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div class="ct" style="color:#1a7a3c;font-size:15px">Interaktivní výpočet zisku z trendu dat</div>
+    <span class="badge">odhad z trendu 2017–2020</span>
+  </div>
+
+  <div class="scen-row">
+    <div class="scen active" id="s-opt" onclick="setScen('opt')">
+      Optimistický<br><strong style="font-size:13px;color:#1a7a3c">8,8 M tržby</strong>
+    </div>
+    <div class="scen" id="s-con" onclick="setScen('con')">
+      Konzervativní<br><strong style="font-size:13px;color:#b86a00">7,8 M tržby</strong>
+    </div>
+    <div class="scen" id="s-pes" onclick="setScen('pes')">
+      Pesimistický<br><strong style="font-size:13px;color:#c0340d">5,5 M tržby</strong>
+    </div>
+    <div class="scen" id="s-cus" onclick="setScen('cus')">
+      Vlastní<br><strong style="font-size:13px;color:#1a5fa8" id="s-cus-val">—</strong>
+    </div>
+  </div>
+
+  <div class="pgrid">
+    <div class="pitem"><div class="pl">Odh. roční tržby</div><div class="pv" id="p-rev">—</div></div>
+    <div class="pitem"><div class="pl">Odh. roční zisk</div><div class="pv" id="p-profit">—</div></div>
+    <div class="pitem"><div class="pl">Dosaženo Q1 2020</div><div class="pv">1 978 K</div></div>
+    <div class="pitem"><div class="pl">Zisk Q1 (est.)</div><div class="pv" id="p-q1">—</div></div>
+  </div>
+
+  <div class="pbrow">
+    <label>Marže %:</label>
+    <input type="number" id="margin-in" value="22" min="5" max="60" class="narrow" oninput="renderProfit()">
+    <label>Vlastní roční tržby (Kč):</label>
+    <input type="number" id="custom-rev" value="8800000" step="100000" oninput="setScen('cus')">
+  </div>
+
+  <div class="pbr-wrap">
+    <div class="pbr-labels"><span>Plnění zisku (Q1 skutečnost / roční odhad)</span><span id="p-pct">—</span></div>
+    <div class="pbr-track"><div class="pbr-fill" id="p-bar"></div></div>
+  </div>
+
+  <div class="ch" style="height:190px"><canvas id="profit-chart" role="img" aria-label="Kumulativní zisk 2020"></canvas></div>
+
+  <div class="sep"></div>
+  <div class="note">
+    Trend: 2017→2018 +80 % · 2018→2019 +50 % · Q1 2020 překonal Q1 2019 o +28 % (COVID dopad od dubna) ·
+    Sezónní faktory odvozeny z měsíčních dat 2019 · Marže je nastavitelná výše.
+  </div>
+</div>
+
+<!-- ── SEKCE 6: 3LETÝ VÝHLED ────────────────────────────────── -->
+<div class="section-label">3letý výhled dle trendu (2020–2022) <span class="badge" style="text-transform:none">prognóza</span></div>
+
+<div class="card">
+  <div class="ct">Prognóza tržeb po čtvrtletích 2020–2022</div>
+  <div class="cs">Historická data + tři scénáře odvozené z trendu a sezónnosti</div>
+  <div class="leg">
+    <span><span class="dot" style="background:#1a7a3c"></span>Historická data</span>
+    <span><span class="dot" style="background:#1a7a3c;opacity:.5"></span>Optimistický</span>
+    <span><span class="dot" style="background:#b86a00;opacity:.6"></span>Konzervativní</span>
+    <span><span class="dot" style="background:#c0340d;opacity:.6"></span>Pesimistický</span>
+  </div>
+  <div class="ch" style="height:280px"><canvas id="forecast-chart" role="img" aria-label="3letý výhled tržeb"></canvas></div>
+</div>
+
+<div class="two">
+  <div class="card" style="margin-bottom:0">
+    <div class="ct">Roční tržby — výhled</div>
+    <div class="cs">Tři scénáře v Kč</div>
+    <table class="forecast-table">
+      <thead>
+        <tr>
+          <th>Rok</th>
+          <th class="opt">Optimist.</th>
+          <th class="con">Konzervat.</th>
+          <th class="pes">Pesimist.</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>hist. 2017</td><td colspan="3" style="color:var(--txt2);text-align:center">2,59 M Kč</td></tr>
+        <tr><td>hist. 2018</td><td colspan="3" style="color:var(--txt2);text-align:center">4,66 M Kč</td></tr>
+        <tr><td>hist. 2019</td><td colspan="3" style="color:var(--txt2);text-align:center">6,99 M Kč</td></tr>
+        <tr style="border-top:0.5px solid var(--border)">
+          <td>2020</td>
+          <td class="opt">8,8 M</td><td class="con">7,8 M</td><td class="pes">5,5 M</td>
+        </tr>
+        <tr><td>2021</td><td class="opt">10,2 M</td><td class="con">8,4 M</td><td class="pes">6,5 M</td></tr>
+        <tr><td>2022</td><td class="opt">12,1 M</td><td class="con">9,9 M</td><td class="pes">7,8 M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-bottom:0">
+    <div class="ct">Klíčové závěry</div>
+    <div class="cs">Z analýzy dat 2017–2020</div>
+    <div style="font-size:12px;color:#1a2e1f;line-height:1.85">
+      <div style="padding:5px 0;border-bottom:0.5px solid var(--border)">↗ Web+DJ+Wolt rostly z <strong>0 %</strong> na <strong>61 %</strong> mixu tržeb za 3 roky</div>
+      <div style="padding:5px 0;border-bottom:0.5px solid var(--border)">↘ Bistro kleslo z 87 % na ~35 % — zdravá diverzifikace</div>
+      <div style="padding:5px 0;border-bottom:0.5px solid var(--border)">⚠ Wolt a Uber přidávají provizi ~25 % — tlak na marži</div>
+      <div style="padding:5px 0;border-bottom:0.5px solid var(--border)">★ DJ kanál (vlastní rozvoz?) — nejlepší marže z delivery</div>
+      <div style="padding:5px 0">⌀ Sezóna: vrchol jaro + podzim, propad červenec–srpen</div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:18px;font-size:10px;color:#5a7a62;text-align:center">
+  Chutnej Bistro Dashboard · generováno automaticky z Google Sheets ·
+  <span id="last-updated">záložní data (Sheet nepřipojen)</span>
+</div>
+
+</div><!-- /page -->
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────────────────────
+// 1. FALLBACK DATA (použije se pokud Sheet není připojen)
+// ─────────────────────────────────────────────────────────────
+const FALLBACK_WEEKS = [
+  {l:'3.6',  web:24660, dj:22200, wolt:14164, uber:0,    bistro:63189,  total:124213},
+  {l:'10.6', web:35772, dj:16446, wolt:9950,  uber:0,    bistro:56275,  total:118443},
+  {l:'17.6', web:25034, dj:23501, wolt:10117, uber:0,    bistro:50340,  total:108992},
+  {l:'24.6', web:19374, dj:22991, wolt:14723, uber:0,    bistro:55936,  total:113024},
+  {l:'1.7',  web:25485, dj:26797, wolt:17035, uber:0,    bistro:60566,  total:129883},
+  {l:'8.7',  web:26376, dj:26799, wolt:9065,  uber:0,    bistro:59516,  total:121756},
+  {l:'15.7', web:25887, dj:26439, wolt:13179, uber:3308, bistro:58073,  total:126886},
+  {l:'22.7', web:27599, dj:19864, wolt:12529, uber:6962, bistro:75620,  total:142574},
+  {l:'29.7', web:26574, dj:23044, wolt:14029, uber:10305,bistro:55196,  total:129148},
+  {l:'5.8',  web:23009, dj:16803, wolt:15800, uber:7149, bistro:58299,  total:121060},
+  {l:'12.8', web:26053, dj:22567, wolt:17505, uber:7010, bistro:58841,  total:131976},
+  {l:'19.8', web:32158, dj:19505, wolt:9462,  uber:4401, bistro:60469,  total:125995},
+  {l:'16.3', web:62728, dj:40327, wolt:34049, uber:15373,bistro:6415,   total:160862},
+  {l:'23.3', web:87194, dj:51246, wolt:49481, uber:14535,bistro:14936,  total:217810},
+];
+
+const MONTHLY_DATA = [
+  {y:2017,m:0, web:68467,  dj:0,      wolt:0,     uber:0,     bistro:10541},
+  {y:2017,m:1, web:56342,  dj:0,      wolt:0,     uber:0,     bistro:8137},
+  {y:2017,m:2, web:83007,  dj:0,      wolt:0,     uber:0,     bistro:69682},
+  {y:2017,m:3, web:66442,  dj:0,      wolt:0,     uber:0,     bistro:118606},
+  {y:2017,m:4, web:53081,  dj:0,      wolt:0,     uber:0,     bistro:151047},
+  {y:2017,m:5, web:62885,  dj:0,      wolt:0,     uber:0,     bistro:145868},
+  {y:2017,m:6, web:46941,  dj:6828,   wolt:0,     uber:0,     bistro:156529},
+  {y:2017,m:7, web:60964,  dj:11666,  wolt:0,     uber:0,     bistro:206345},
+  {y:2017,m:8, web:45251,  dj:5313,   wolt:0,     uber:0,     bistro:145690},
+  {y:2017,m:9, web:61613,  dj:9100,   wolt:0,     uber:0,     bistro:188723},
+  {y:2017,m:10,web:51949,  dj:14559,  wolt:0,     uber:0,     bistro:144468},
+  {y:2017,m:11,web:47941,  dj:97534,  wolt:0,     uber:0,     bistro:139826},
+  {y:2018,m:0, web:55083,  dj:93154,  wolt:0,     uber:0,     bistro:153233},
+  {y:2018,m:1, web:54424,  dj:100022, wolt:0,     uber:0,     bistro:158150},
+  {y:2018,m:2, web:64588,  dj:140772, wolt:0,     uber:0,     bistro:220151},
+  {y:2018,m:3, web:40969,  dj:115105, wolt:0,     uber:0,     bistro:216596},
+  {y:2018,m:4, web:61173,  dj:97707,  wolt:0,     uber:0,     bistro:244833},
+  {y:2018,m:5, web:66338,  dj:103218, wolt:1081,  uber:0,     bistro:245683},
+  {y:2018,m:6, web:43675,  dj:96816,  wolt:3632,  uber:0,     bistro:205759},
+  {y:2018,m:7, web:56539,  dj:133978, wolt:21520, uber:0,     bistro:253477},
+  {y:2018,m:8, web:59044,  dj:93522,  wolt:24610, uber:0,     bistro:208700},
+  {y:2018,m:9, web:57102,  dj:116397, wolt:30570, uber:0,     bistro:234853},
+  {y:2018,m:10,web:57429,  dj:130448, wolt:32882, uber:0,     bistro:226692},
+  {y:2018,m:11,web:46235,  dj:99718,  wolt:33224, uber:0,     bistro:163767},
+  {y:2019,m:0, web:55694,  dj:121451, wolt:46682, uber:0,     bistro:202108},
+  {y:2019,m:1, web:87643,  dj:108667, wolt:54399, uber:0,     bistro:185902},
+  {y:2019,m:2, web:127309, dj:112541, wolt:52460, uber:0,     bistro:252369},
+  {y:2019,m:3, web:122266, dj:113298, wolt:40834, uber:0,     bistro:249055},
+  {y:2019,m:4, web:142470, dj:126371, wolt:45241, uber:0,     bistro:259688},
+  {y:2019,m:5, web:113530, dj:94661,  wolt:53472, uber:0,     bistro:272753},
+  {y:2019,m:6, web:117714, dj:107358, wolt:57601, uber:14084, bistro:272205},
+  {y:2019,m:7, web:115768, dj:91755,  wolt:60393, uber:31684, bistro:264206},
+  {y:2019,m:8, web:117501, dj:75986,  wolt:61696, uber:14638, bistro:279057},
+  {y:2019,m:9, web:116251, dj:80318,  wolt:63417, uber:24417, bistro:301652},
+  {y:2019,m:10,web:129900, dj:92734,  wolt:97469, uber:36404, bistro:258480},
+  {y:2019,m:11,web:118749, dj:87560,  wolt:66524, uber:21421, bistro:190650},
+  {y:2020,m:0, web:124820, dj:96440,  wolt:81515, uber:28664, bistro:257826},
+  {y:2020,m:1, web:128004, dj:67016,  wolt:89026, uber:27041, bistro:293439},
+  {y:2020,m:2, web:254866, dj:148607, wolt:162742,uber:52602, bistro:133843},
+];
+
+const MIX_DATA = {
+  0:{y:2017, web:26, dj:8,  wolt:0,  uber:0, bistro:66},
+  1:{y:2018, web:14, dj:28, wolt:5,  uber:0, bistro:53},
+  2:{y:2019, web:22, dj:18, wolt:11, uber:4, bistro:45},
+  3:{y:2020, web:25, dj:16, wolt:19, uber:5, bistro:35},
+};
+
+const SEASONAL = [0.0665,0.0681,0.085,0.082,0.0895,0.0834,0.0888,0.088,0.0856,0.0915,0.096,0.0757];
+const MONTHS_CS = ['Led','Úno','Bře','Dub','Kvě','Čer','Čvc','Srp','Zář','Říj','Lis','Pro'];
+const C = {
+  a:  '#1a7a3c',   // Web       — tmavě zelená
+  dj: '#1a5fa8',   // DJ        — modrá
+  am: '#b86a00',   // Wolt      — oranžová
+  co: '#c0340d',   // Uber      — červená
+  bi: '#7b3fa0',   // Bistro    — fialová
+  gr: 'rgba(30,90,60,0.07)',
+  t2: '#374a3c',   // axis/legend text — tmavý, čitelný na bílém
+};
+
+// ─────────────────────────────────────────────────────────────
+// 2. GOOGLE SHEETS LOADER
+// ─────────────────────────────────────────────────────────────
+const SHEET_ID_KEY   = 'bistro_sheet_id';
+const GID_DAYS_KEY   = 'bistro_gid_days';
+const GID_MONTHS_KEY = 'bistro_gid_months';
+
+function loadConfig() {
+  const id = localStorage.getItem(SHEET_ID_KEY) || '';
+  const gd = localStorage.getItem(GID_DAYS_KEY) || '0';
+  const gm = localStorage.getItem(GID_MONTHS_KEY) || '';
+  if (id) {
+    document.getElementById('sheet-id').value   = id;
+    document.getElementById('gid-days').value   = gd;
+    document.getElementById('gid-months').value = gm;
+  }
+  return { id, gd, gm };
+}
+
+function sheetUrl(id, gid) {
+  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
+}
+
+function parseCzk(s) {
+  if (!s) return 0;
+  const n = parseInt(s.replace(/\xa0|\s/g, '').replace('Kč','').replace(',',''));
+  return isNaN(n) ? 0 : n;
+}
+
+async function fetchCsv(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return await r.text();
+}
+
+function parseDaysCsv(text) {
+  const dayMap = {sobota:6,neděle:7,pondělí:1,úterý:2,středa:3,čtvrtek:4,pátek:5};
+  const monMap = {února:2,března:3,dubna:4,května:5,června:6,července:7,
+                  srpna:8,září:9,října:10,listopadu:11,prosince:12,ledna:1};
+  const rows = text.split('\n').slice(1);
+  const records = [];
+  for (const row of rows) {
+    const cols = row.split(',');
+    if (cols.length < 17) continue;
+    const parts = cols[0].trim().split(/\s+/);
+    if (!parts.length) continue;
+    const dow = dayMap[parts[0].toLowerCase()];
+    if (!dow) continue;
+    let day = null, mon = null;
+    for (const p of parts) {
+      const n = parseInt(p);
+      if (!isNaN(n) && day === null) day = n;
+      const mv = monMap[p.toLowerCase()];
+      if (mv && !mon) mon = mv;
+    }
+    if (!day || !mon) continue;
+    records.push({
+      dow, day, mon,
+      web:    parseCzk(cols[11]),
+      bistro: parseCzk(cols[12]),
+      dj:     parseCzk(cols[13]),
+      wolt:   parseCzk(cols[14]),
+      uber:   parseCzk(cols[15]),
+      total:  parseCzk(cols[16]),
+    });
+  }
+  // group Mon–Sun
+  const weeks = [];
+  let cur = [];
+  for (const r of records) {
+    if (r.dow === 1 && cur.length) { weeks.push(cur); cur = []; }
+    cur.push(r);
+  }
+  if (cur.length) weeks.push(cur);
+  return weeks
+    .filter(w => w.length === 7 && w.reduce((s,r) => s + r.total, 0) > 20000)
+    .slice(-14)
+    .map(w => ({
+      l: `${w[0].day}.${w[0].mon}`,
+      web:    w.reduce((s,r) => s+r.web,0),
+      dj:     w.reduce((s,r) => s+r.dj,0),
+      wolt:   w.reduce((s,r) => s+r.wolt,0),
+      uber:   w.reduce((s,r) => s+r.uber,0),
+      bistro: w.reduce((s,r) => s+r.bistro,0),
+      total:  w.reduce((s,r) => s+r.total,0),
+    }));
+}
+
+async function connectSheets() {
+  const id = document.getElementById('sheet-id').value.trim();
+  const gd = document.getElementById('gid-days').value.trim() || '0';
+  const gm = document.getElementById('gid-months').value.trim() || '0';
+  if (!id) { showError('Zadej ID Sheetu.'); return; }
+
+  localStorage.setItem(SHEET_ID_KEY, id);
+  localStorage.setItem(GID_DAYS_KEY, gd);
+  localStorage.setItem(GID_MONTHS_KEY, gm);
+
+  document.getElementById('loading-bar').classList.add('active');
+  document.getElementById('error-banner').classList.remove('active');
+  try {
+    const csvDays = await fetchCsv(sheetUrl(id, gd));
+    const liveWeeks = parseDaysCsv(csvDays);
+    if (liveWeeks.length > 0) {
+      renderWeeklyChart(liveWeeks);
+      renderWeeklyKpis(liveWeeks);
+      document.getElementById('data-badge').textContent = '● živá data';
+      document.getElementById('data-badge').style.background = 'rgba(77,184,106,.25)';
+      document.getElementById('last-updated').textContent =
+        'Naposledy aktualizováno: ' + new Date().toLocaleString('cs-CZ');
+    } else {
+      showError('Data načtena, ale žádné kompletní týdny Po–Ne nebyly nalezeny. Zkontroluj formát Sheetu.');
+    }
+  } catch(e) {
+    showError(`Nepodařilo se načíst data: ${e.message}. Zkontroluj, že Sheet je publikován jako CSV (Soubor → Sdílení → Publikovat na webu).`);
+  } finally {
+    document.getElementById('loading-bar').classList.remove('active');
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. CHART INSTANCES
+// ─────────────────────────────────────────────────────────────
+let charts = {};
+
+function mkChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), config);
+  return charts[id];
+}
+
+function fmt(n) { return Math.round(n).toLocaleString('cs-CZ') + ' Kč'; }
+function fmtK(n) { return Math.round(n/1000) + ' K Kč'; }
+
+// ─────────────────────────────────────────────────────────────
+// 4. WEEKLY CHART + KPIS
+// ─────────────────────────────────────────────────────────────
+function renderWeeklyKpis(data) {
+  const last = data[data.length-1];
+  const prev = data[data.length-2] || last;
+  document.getElementById('kw-total').textContent = fmtK(last.total);
+  document.getElementById('kw-range').textContent = 'týden od ' + last.l;
+  document.getElementById('kw-avg').textContent   = fmtK(last.total/7);
+  const d = ((last.total - prev.total)/prev.total*100).toFixed(1);
+  const el = document.getElementById('kw-diff');
+  el.textContent = (d>0?'+':'') + d + ' %';
+  el.className = 'kv ' + (d>0?'pos':'neg');
+  document.getElementById('kw-diff-abs').textContent = fmtK(prev.total) + ' → ' + fmtK(last.total);
+  const ch = {web:'Web',dj:'DJ',wolt:'Wolt',uber:'Uber',bistro:'Bistro'};
+  let topK = 'bistro', topV = last.bistro;
+  for (const [k,v] of Object.entries({web:last.web,dj:last.dj,wolt:last.wolt,uber:last.uber,bistro:last.bistro})) {
+    if (v > topV) { topV = v; topK = k; }
+  }
+  document.getElementById('kw-top').textContent     = ch[topK];
+  document.getElementById('kw-top-val').textContent = fmtK(topV) + ' tento týden';
+}
+
+function renderWeeklyChart(data) {
+  mkChart('wc', {
+    type: 'bar',
+    data: {
+      labels: data.map(d=>d.l),
+      datasets: [
+        {label:'Web',    data:data.map(d=>d.web),    backgroundColor:C.a,  stack:'s'},
+        {label:'DJ',     data:data.map(d=>d.dj),     backgroundColor:C.dj, stack:'s'},
+        {label:'Wolt',   data:data.map(d=>d.wolt),   backgroundColor:C.am, stack:'s'},
+        {label:'Uber',   data:data.map(d=>d.uber),   backgroundColor:C.co, stack:'s'},
+        {label:'Bistro', data:data.map(d=>d.bistro), backgroundColor:C.bi, stack:'s'},
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtK(c.raw)}}},
+      scales:{
+        x:{stacked:true, ticks:{color:C.t2,font:{size:9},maxRotation:45,autoSkip:false}, grid:{color:C.gr}},
+        y:{stacked:true, ticks:{color:C.t2,font:{size:10},callback:v=>Math.round(v/1000)+'K'}, grid:{color:C.gr}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. MONTHLY CHART
+// ─────────────────────────────────────────────────────────────
+function renderMonthlyChart() {
+  const labels = MONTHLY_DATA.map(d => {
+    const ms=['L','Ú','Bř','D','K','Čn','Čc','Sp','Zř','Ř','Li','Pr'];
+    return ms[d.m]+' '+d.y;
+  });
+  mkChart('mc-monthly', {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Web',    data:MONTHLY_DATA.map(d=>d.web),    backgroundColor:C.a,  stack:'s'},
+        {label:'DJ',     data:MONTHLY_DATA.map(d=>d.dj),     backgroundColor:C.dj, stack:'s'},
+        {label:'Wolt',   data:MONTHLY_DATA.map(d=>d.wolt),   backgroundColor:C.am, stack:'s'},
+        {label:'Uber',   data:MONTHLY_DATA.map(d=>d.uber),   backgroundColor:C.co, stack:'s'},
+        {label:'Bistro', data:MONTHLY_DATA.map(d=>d.bistro), backgroundColor:C.bi, stack:'s'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtK(c.raw)}}},
+      scales:{
+        x:{stacked:true, ticks:{color:C.t2,font:{size:8},maxRotation:60,autoSkip:true,maxTicksLimit:18}, grid:{color:C.gr}},
+        y:{stacked:true, ticks:{color:C.t2,font:{size:10},callback:v=>Math.round(v/1000)+'K'}, grid:{color:C.gr}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6. MIX DONUT
+// ─────────────────────────────────────────────────────────────
+function setYear(idx, btn, fromSlider) {
+  if (btn) {
+    document.querySelectorAll('.yr-tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('yr-sl').value = idx;
+  }
+  if (fromSlider) {
+    document.querySelectorAll('.yr-tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  }
+  document.getElementById('yr-label').textContent = MIX_DATA[idx].y;
+  const d = MIX_DATA[idx];
+  mkChart('mix-donut', {
+    type:'doughnut',
+    data:{
+      labels:['Web','DJ','Wolt','Uber','Bistro'],
+      datasets:[{
+        data:[d.web,d.dj,d.wolt,d.uber,d.bistro],
+        backgroundColor:[C.a,C.dj,C.am,C.co,C.bi],
+        borderWidth:2, borderColor:'#fff', borderRadius:2
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'65%',
+      plugins:{
+        legend:{position:'bottom',labels:{color:C.t2,font:{size:10},padding:8,usePointStyle:true,pointStyleWidth:8}},
+        tooltip:{callbacks:{label:c=>c.label+': '+c.raw+' %'}}
+      }
+    }
+  });
+}
+
+function renderMixTrend() {
+  mkChart('mix-trend', {
+    type:'line',
+    data:{
+      labels:['2017','2018','2019','2020'],
+      datasets:[
+        {label:'Web',    data:[26,14,22,25], borderColor:'#1a7a3c', backgroundColor:'rgba(26,122,60,.1)',  fill:true, tension:.4, pointRadius:5, pointBackgroundColor:'#1a7a3c', borderWidth:2.5},
+        {label:'DJ',     data:[8,28,18,16],  borderColor:'#1a5fa8', backgroundColor:'rgba(26,95,168,.08)', fill:true, tension:.4, pointRadius:5, pointBackgroundColor:'#1a5fa8', borderWidth:2.5},
+        {label:'Wolt',   data:[0,5,11,19],   borderColor:'#b86a00', backgroundColor:'rgba(184,106,0,.08)', fill:true, tension:.4, pointRadius:5, pointBackgroundColor:'#b86a00', borderWidth:2.5},
+        {label:'Bistro', data:[66,53,45,35], borderColor:'#7b3fa0', backgroundColor:'rgba(123,63,160,.08)',fill:true, tension:.4, pointRadius:5, pointBackgroundColor:'#7b3fa0', borderWidth:2.5},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+' %'}}},
+      scales:{
+        x:{ticks:{color:C.t2,font:{size:11}}, grid:{color:C.gr}},
+        y:{min:0,max:80, ticks:{color:C.t2,font:{size:10},callback:v=>v+'%'}, grid:{color:C.gr}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7. CF CHART
+// ─────────────────────────────────────────────────────────────
+function renderCfChart() {
+  const years    = ['2017','2018','2019','2020 Q1'];
+  const rev      = [2593286,4662493,6988068,1978016*4];
+  const commiss  = [0,418000,1250000,640000];
+  const cf       = rev.map((r,i)=>Math.round((r-commiss[i])*0.22));
+  mkChart('cf-chart', {
+    type:'bar',
+    data:{
+      labels:years,
+      datasets:[
+        {label:'Hrubé tržby',        data:rev,     backgroundColor:'rgba(26,122,60,.8)',   barPercentage:.45},
+        {label:'Odh. CF (22% marže)', data:cf,      backgroundColor:'rgba(26,95,168,.8)',   barPercentage:.45},
+        {label:'Provize platforem',   data:commiss, backgroundColor:'rgba(184,106,0,.75)',  barPercentage:.45},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:C.t2,font:{size:11},usePointStyle:true,padding:12,pointStyleWidth:8}},
+               tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtK(c.raw)}}},
+      scales:{
+        x:{ticks:{color:C.t2,font:{size:12}}, grid:{color:C.gr}},
+        y:{ticks:{color:C.t2,font:{size:10},callback:v=>Math.round(v/1000)+'K'}, grid:{color:C.gr}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. PROFIT / FORECAST
+// ─────────────────────────────────────────────────────────────
+const SCEN = {
+  opt:{rev:8800000, color:'#1a7a3c'},
+  con:{rev:7800000, color:'#b86a00'},
+  pes:{rev:5500000, color:'#c0340d'},
+  cus:{rev:8800000, color:'#1a5fa8'},
+};
+let curScen = 'opt';
+
+function setScen(s) {
+  curScen = s;
+  if (s === 'cus') {
+    SCEN.cus.rev = parseInt(document.getElementById('custom-rev').value)||8800000;
+    document.getElementById('s-cus-val').textContent =
+      (Math.round(SCEN.cus.rev/1e5)/10).toFixed(1)+' M';
+  }
+  ['opt','con','pes','cus'].forEach(k =>
+    document.getElementById('s-'+k).classList.toggle('active', k===s));
+  renderProfit();
+}
+
+function renderProfit() {
+  const margin = (parseInt(document.getElementById('margin-in').value)||22)/100;
+  const sc     = SCEN[curScen];
+  const rev    = sc.rev;
+  const profit = Math.round(rev*margin);
+  const q1p    = Math.round(1978016*margin);
+  const pct    = Math.min(100, Math.round(q1p/profit*100));
+
+  document.getElementById('p-rev').textContent    = fmtK(rev);
+  document.getElementById('p-profit').textContent = fmtK(profit);
+  document.getElementById('p-q1').textContent     = fmtK(q1p);
+  document.getElementById('p-pct').textContent    = pct+' %';
+  const bar = document.getElementById('p-bar');
+  bar.style.width      = pct+'%';
+  bar.style.background = pct>=80?'#1a7a3c':pct>50?'#b86a00':'#c0340d';
+
+  const cumEst=[], cumGoal=[];
+  let accE=0, accG=0;
+  SEASONAL.forEach((sf,i)=>{
+    accE += rev*sf*margin; cumEst.push(Math.round(accE));
+    accG += profit/12;     cumGoal.push(Math.round(accG));
+  });
+  const q1actual = [
+    Math.round(589265*margin),
+    Math.round((589265+627341)*margin),
+    Math.round((589265+627341+761410)*margin),
+  ];
+
+  mkChart('profit-chart', {
+    type:'line',
+    data:{
+      labels:MONTHS_CS,
+      datasets:[
+        {label:'Kumulativní zisk (odhad)', data:cumEst,   borderColor:sc.color, backgroundColor:sc.color+'22', fill:true, tension:.4, pointRadius:3, pointBackgroundColor:sc.color, borderWidth:2},
+        {label:'Rovnoměrný cíl', data:cumGoal, borderColor:'rgba(90,90,90,.4)', borderDash:[5,4], fill:false, tension:.3, pointRadius:0, borderWidth:1.5},
+        {label:'Skutečnost Q1', data:[...q1actual,...Array(9).fill(null)], borderColor:'#1a5fa8', fill:false, pointRadius:5, pointBackgroundColor:'#1a5fa8', borderWidth:2.5, spanGaps:false},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:C.t2,font:{size:10},usePointStyle:true,padding:10,pointStyleWidth:8}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtK(c.raw)}}
+      },
+      scales:{
+        x:{ticks:{color:C.t2,font:{size:10}}, grid:{color:C.gr}},
+        y:{ticks:{color:C.t2,font:{size:10},callback:v=>Math.round(v/1000)+'K'}, grid:{color:C.gr}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9. 3Y FORECAST CHART
+// ─────────────────────────────────────────────────────────────
+function renderForecastChart() {
+  const ql = ['2019 Q1','2019 Q2','2019 Q3','2019 Q4',
+              '2020 Q1','2020 Q2','2020 Q3','2020 Q4',
+              '2021 Q1','2021 Q2','2021 Q3','2021 Q4',
+              '2022 Q1','2022 Q2','2022 Q3','2022 Q4'];
+  const hist = [1678598,1683869,1681646,1944508, 1978016,null,null,null, null,null,null,null, null,null,null,null];
+  const opt  = [null,null,null,null, 1978016,2200000,2050000,2250000, 2600000,2400000,2200000,3000000, 3100000,2900000,2700000,3400000];
+  const con  = [null,null,null,null, 1978016,1400000,1700000,2100000, 2100000,2200000,2100000,2000000, 2600000,2700000,2500000,2100000];
+  const pes  = [null,null,null,null, 1978016,600000,900000,1300000,   1700000,1800000,1600000,1400000, 2000000,2100000,1900000,1800000];
+  mkChart('forecast-chart', {
+    type:'line',
+    data:{
+      labels:ql,
+      datasets:[
+        {label:'Historická data', data:hist, borderColor:'#1a7a3c', backgroundColor:'rgba(26,122,60,.1)', fill:true,  tension:.3, pointRadius:4, borderWidth:2.5, spanGaps:false},
+        {label:'Optimistický',    data:opt,  borderColor:'#1a7a3c', borderDash:[5,3], fill:false, tension:.3, pointRadius:3, borderWidth:2, spanGaps:false},
+        {label:'Konzervativní',   data:con,  borderColor:'#b86a00', borderDash:[5,3], fill:false, tension:.3, pointRadius:3, borderWidth:2, spanGaps:false},
+        {label:'Pesimistický',    data:pes,  borderColor:'#c0340d', borderDash:[5,3], fill:false, tension:.3, pointRadius:3, borderWidth:2, spanGaps:false},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:C.t2,font:{size:11},usePointStyle:true,padding:12,pointStyleWidth:8}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtK(c.raw)}}
+      },
+      scales:{
+        x:{ticks:{color:C.t2,font:{size:10},maxRotation:45}, grid:{color:C.gr}},
+        y:{ticks:{color:C.t2,font:{size:10},callback:v=>Math.round(v/1000)+'K'}, grid:{color:C.gr}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10. INIT
+// ─────────────────────────────────────────────────────────────
+function init() {
+  renderWeeklyChart(FALLBACK_WEEKS);
+  renderWeeklyKpis(FALLBACK_WEEKS);
+  renderMonthlyChart();
+  setYear(2, null, false);
+  renderMixTrend();
+  renderCfChart();
+  renderProfit();
+  renderForecastChart();
+  loadConfig();
+  // Auto-connect if Sheet ID was saved
+  const { id } = loadConfig();
+  if (id) connectSheets();
+}
+
+init();
+</script>
+</body>
+</html>
