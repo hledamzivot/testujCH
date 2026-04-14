@@ -219,22 +219,16 @@ body {
 <details class="cfg-panel" id="cfg-panel">
   <summary>⚙ Nastavení Google Sheets — klikni pro propojení s live daty</summary>
   <div class="cfg-fields">
-    <div class="cfg-field">
-      <label>ID Google Sheetu</label>
-      <input type="text" id="sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
-    </div>
-    <div class="cfg-field">
-      <label>GID listu "Po dnech"</label>
-      <input type="text" id="gid-days" placeholder="0" class="narrow" />
-    </div>
-    <div class="cfg-field">
-      <label>GID listu "Po měsících"</label>
-      <input type="text" id="gid-months" placeholder="1234567" class="narrow" />
+    <div class="cfg-field" style="flex:1;min-width:260px">
+      <label>CSV link listu "Po dnech" (z Publikovat na webu)</label>
+      <input type="text" id="sheet-id" style="width:100%"
+        placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=…&output=csv" />
     </div>
     <button class="cfg-btn" onclick="connectSheets()">Připojit a načíst →</button>
   </div>
-  <div style="margin-top:10px;font-size:11px;color:var(--txt3)">
-    Sheet musí být publikován: <strong style="color:var(--txt2)">Soubor → Sdílení → Publikovat na webu → Celý dokument → CSV</strong>
+  <div style="margin-top:10px;font-size:11px;color:var(--txt3);line-height:1.7">
+    Zkopíruj přesně URL z: <strong style="color:var(--txt2)">Soubor → Sdílení → Publikovat na webu → list "Po dnech" → CSV</strong><br>
+    Vypadá takto: <code style="font-size:10px;color:var(--accent)">https://docs.google.com/spreadsheets/d/e/2PACX-.../pub?gid=1499577549&amp;single=true&amp;output=csv</code>
   </div>
 </details>
 
@@ -544,24 +538,12 @@ const C = {
 // ─────────────────────────────────────────────────────────────
 // 2. GOOGLE SHEETS LOADER
 // ─────────────────────────────────────────────────────────────
-const SHEET_ID_KEY   = 'bistro_sheet_id';
-const GID_DAYS_KEY   = 'bistro_gid_days';
-const GID_MONTHS_KEY = 'bistro_gid_months';
+const SHEET_URL_KEY = 'bistro_sheet_url';
 
 function loadConfig() {
-  const id = localStorage.getItem(SHEET_ID_KEY) || '';
-  const gd = localStorage.getItem(GID_DAYS_KEY) || '0';
-  const gm = localStorage.getItem(GID_MONTHS_KEY) || '';
-  if (id) {
-    document.getElementById('sheet-id').value   = id;
-    document.getElementById('gid-days').value   = gd;
-    document.getElementById('gid-months').value = gm;
-  }
-  return { id, gd, gm };
-}
-
-function sheetUrl(id, gid) {
-  return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
+  const url = localStorage.getItem(SHEET_URL_KEY) || '';
+  if (url) document.getElementById('sheet-id').value = url;
+  return { url };
 }
 
 function parseCzk(s) {
@@ -607,7 +589,6 @@ function parseDaysCsv(text) {
       total:  parseCzk(cols[16]),
     });
   }
-  // group Mon–Sun
   const weeks = [];
   let cur = [];
   for (const r of records) {
@@ -619,7 +600,7 @@ function parseDaysCsv(text) {
     .filter(w => w.length === 7 && w.reduce((s,r) => s + r.total, 0) > 20000)
     .slice(-14)
     .map(w => ({
-      l: `${w[0].day}.${w[0].mon}`,
+      l:      `${w[0].day}.${w[0].mon}`,
       web:    w.reduce((s,r) => s+r.web,0),
       dj:     w.reduce((s,r) => s+r.dj,0),
       wolt:   w.reduce((s,r) => s+r.wolt,0),
@@ -630,32 +611,31 @@ function parseDaysCsv(text) {
 }
 
 async function connectSheets() {
-  const id = document.getElementById('sheet-id').value.trim();
-  const gd = document.getElementById('gid-days').value.trim() || '0';
-  const gm = document.getElementById('gid-months').value.trim() || '0';
-  if (!id) { showError('Zadej ID Sheetu.'); return; }
+  const url = document.getElementById('sheet-id').value.trim();
+  if (!url) { showError('Vlož CSV link ze "Publikovat na webu".'); return; }
+  if (!url.includes('docs.google.com')) { showError('URL nevypadá správně — zkopíruj ho znovu z Publikovat na webu.'); return; }
 
-  localStorage.setItem(SHEET_ID_KEY, id);
-  localStorage.setItem(GID_DAYS_KEY, gd);
-  localStorage.setItem(GID_MONTHS_KEY, gm);
+  localStorage.setItem(SHEET_URL_KEY, url);
 
   document.getElementById('loading-bar').classList.add('active');
   document.getElementById('error-banner').classList.remove('active');
   try {
-    const csvDays = await fetchCsv(sheetUrl(id, gd));
+    const csvDays = await fetchCsv(url);
     const liveWeeks = parseDaysCsv(csvDays);
     if (liveWeeks.length > 0) {
       renderWeeklyChart(liveWeeks);
       renderWeeklyKpis(liveWeeks);
       document.getElementById('data-badge').textContent = '● živá data';
-      document.getElementById('data-badge').style.background = 'rgba(77,184,106,.25)';
+      document.getElementById('data-badge').style.cssText =
+        'background:rgba(26,122,60,.2);color:#1a7a3c;border-color:rgba(26,122,60,.4)';
       document.getElementById('last-updated').textContent =
         'Naposledy aktualizováno: ' + new Date().toLocaleString('cs-CZ');
+      document.getElementById('error-banner').classList.remove('active');
     } else {
-      showError('Data načtena, ale žádné kompletní týdny Po–Ne nebyly nalezeny. Zkontroluj formát Sheetu.');
+      showError('Data načtena, ale žádné kompletní týdny Po–Ne nebyly nalezeny. Zkontroluj, že jsi vybral správný list.');
     }
   } catch(e) {
-    showError(`Nepodařilo se načíst data: ${e.message}. Zkontroluj, že Sheet je publikován jako CSV (Soubor → Sdílení → Publikovat na webu).`);
+    showError(`Nepodařilo se načíst data: ${e.message}. Zkontroluj URL — musí být z "Publikovat na webu", ne z adresního řádku.`);
   } finally {
     document.getElementById('loading-bar').classList.remove('active');
   }
@@ -970,10 +950,13 @@ function init() {
   renderCfChart();
   renderProfit();
   renderForecastChart();
-  loadConfig();
-  // Auto-connect if Sheet ID was saved
-  const { id } = loadConfig();
-  if (id) connectSheets();
+  const { url } = loadConfig();
+  if (url) connectSheets();
+  // Auto-refresh každých 5 minut pokud je Sheet připojen
+  setInterval(() => {
+    const u = localStorage.getItem(SHEET_URL_KEY);
+    if (u) connectSheets();
+  }, 5 * 60 * 1000);
 }
 
 init();
